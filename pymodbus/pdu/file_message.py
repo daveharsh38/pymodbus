@@ -52,6 +52,17 @@ class FileRecordPDU(ModbusPDU):  # pylint: disable=abstract-method
         super().__init__(transaction_id=transaction_id, dev_id=dev_id)
         self.records: list[FileRecord] = records or []
 
+    @staticmethod
+    def _encode_record_header(record: FileRecord) -> bytes:
+        """Encode reference type, file number, record number and record length."""
+        return struct.pack(
+            ">BHHH",
+            0x06,
+            record.file_number,
+            record.record_number,
+            record.record_length,
+        )
+
 
 class ReadFileRecordRequest(FileRecordPDU):
     """ReadFileRecordRequest."""
@@ -62,13 +73,7 @@ class ReadFileRecordRequest(FileRecordPDU):
         """Encode the request packet."""
         packet = struct.pack("B", len(self.records) * 7)
         for record in self.records:
-            packet += struct.pack(
-                ">BHHH",
-                0x06,
-                record.file_number,
-                record.record_number,
-                record.record_length,
-            )
+            packet += self._encode_record_header(record)
         return packet
 
     def x_decode(self, data: bytes) -> None:
@@ -142,13 +147,7 @@ class WriteFileRecordRequest(FileRecordPDU):
         packet = struct.pack("B", total_length)
 
         for record in self.records:
-            packet += struct.pack(
-                ">BHHH",
-                0x06,
-                record.file_number,
-                record.record_number,
-                record.record_length,
-            )
+            packet += self._encode_record_header(record)
             packet += record.record_data
         return packet
 
@@ -192,13 +191,7 @@ class WriteFileRecordResponse(FileRecordPDU):
         total_length = sum((record.record_length * 2) + 7 for record in self.records)
         packet = struct.pack("B", total_length)
         for record in self.records:
-            packet += struct.pack(
-                ">BHHH",
-                0x06,
-                record.file_number,
-                record.record_number,
-                record.record_length,
-            )
+            packet += self._encode_record_header(record)
             packet += record.record_data
         return packet
 
