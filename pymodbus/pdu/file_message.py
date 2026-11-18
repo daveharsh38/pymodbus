@@ -31,10 +31,11 @@ class FileRecord:
         self.record_length //= 2
 
 
-class ReadFileRecordRequest(ModbusPDU):
-    """ReadFileRecordRequest."""
+class FileRecordPDU(ModbusPDU):  # pylint: disable=abstract-method
+    """Common base for read/write file record requests and responses.
 
-    function_code = 0x14
+    x_encode() / x_decode() are implemented by the subclasses.
+    """
 
     @classmethod
     def x_calculateRtuFrameSize(cls, data: bytes) -> int:
@@ -50,6 +51,12 @@ class ReadFileRecordRequest(ModbusPDU):
         """Initialize a new instance."""
         super().__init__(transaction_id=transaction_id, dev_id=dev_id)
         self.records: list[FileRecord] = records or []
+
+
+class ReadFileRecordRequest(FileRecordPDU):
+    """ReadFileRecordRequest."""
+
+    function_code = 0x14
 
     def x_encode(self) -> bytes:
         """Encode the request packet."""
@@ -93,25 +100,10 @@ class ReadFileRecordRequest(ModbusPDU):
         )
 
 
-class ReadFileRecordResponse(ModbusPDU):
+class ReadFileRecordResponse(FileRecordPDU):
     """ReadFileRecordResponse."""
 
     function_code = 0x14
-
-    @classmethod
-    def x_calculateRtuFrameSize(cls, data: bytes) -> int:
-        """Calculate the size of a PDU."""
-        return int(data[2]) + 2 + 3
-
-    def __init__(
-        self,
-        records: list[FileRecord] | None = None,
-        dev_id: int = 1,
-        transaction_id: int = 0,
-    ) -> None:
-        """Initialize a new instance."""
-        super().__init__(transaction_id=transaction_id, dev_id=dev_id)
-        self.records: list[FileRecord] = records or []
 
     def x_encode(self) -> bytes:
         """Encode the response."""
@@ -139,25 +131,10 @@ class ReadFileRecordResponse(ModbusPDU):
             self.records.append(record)
 
 
-class WriteFileRecordRequest(ModbusPDU):
+class WriteFileRecordRequest(FileRecordPDU):
     """WriteFileRecordRequest."""
 
     function_code = 0x15
-
-    @classmethod
-    def x_calculateRtuFrameSize(cls, data: bytes) -> int:
-        """Calculate the size of a PDU."""
-        return int(data[2]) + 2 + 3
-
-    def __init__(
-        self,
-        records: list[FileRecord] | None = None,
-        dev_id: int = 1,
-        transaction_id: int = 0,
-    ) -> None:
-        """Initialize a new instance."""
-        super().__init__(transaction_id=transaction_id, dev_id=dev_id)
-        self.records: list[FileRecord] = records or []
 
     def x_encode(self) -> bytes:
         """Encode the request packet."""
@@ -205,25 +182,10 @@ class WriteFileRecordRequest(ModbusPDU):
         )
 
 
-class WriteFileRecordResponse(ModbusPDU):
+class WriteFileRecordResponse(FileRecordPDU):
     """The normal response is an echo of the request."""
 
     function_code = 0x15
-
-    @classmethod
-    def x_calculateRtuFrameSize(cls, data: bytes) -> int:
-        """Calculate the size of a PDU."""
-        return int(data[2]) + 2 + 3
-
-    def __init__(
-        self,
-        records: list[FileRecord] | None = None,
-        dev_id: int = 1,
-        transaction_id: int = 0,
-    ) -> None:
-        """Initialize a new instance."""
-        super().__init__(transaction_id=transaction_id, dev_id=dev_id)
-        self.records: list[FileRecord] = records or []
 
     def x_encode(self) -> bytes:
         """Encode the response."""
