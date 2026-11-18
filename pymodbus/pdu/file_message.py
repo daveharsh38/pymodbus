@@ -30,6 +30,16 @@ class FileRecord:
             raise ModbusException("length of record_data must be a multiple of 2")
         self.record_length //= 2
 
+    def encode_header(self) -> bytes:
+        """Encode reference type, file number, record number and record length."""
+        return struct.pack(
+            ">BHHH",
+            0x06,
+            self.file_number,
+            self.record_number,
+            self.record_length,
+        )
+
 
 class FileRecordPDU(ModbusPDU):  # pylint: disable=abstract-method
     """Common base for read/write file record requests and responses.
@@ -52,17 +62,6 @@ class FileRecordPDU(ModbusPDU):  # pylint: disable=abstract-method
         super().__init__(transaction_id=transaction_id, dev_id=dev_id)
         self.records: list[FileRecord] = records or []
 
-    @staticmethod
-    def _encode_record_header(record: FileRecord) -> bytes:
-        """Encode reference type, file number, record number and record length."""
-        return struct.pack(
-            ">BHHH",
-            0x06,
-            record.file_number,
-            record.record_number,
-            record.record_length,
-        )
-
 
 class ReadFileRecordRequest(FileRecordPDU):
     """ReadFileRecordRequest."""
@@ -73,7 +72,7 @@ class ReadFileRecordRequest(FileRecordPDU):
         """Encode the request packet."""
         packet = struct.pack("B", len(self.records) * 7)
         for record in self.records:
-            packet += self._encode_record_header(record)
+            packet += record.encode_header()
         return packet
 
     def x_decode(self, data: bytes) -> None:
@@ -147,7 +146,7 @@ class WriteFileRecordRequest(FileRecordPDU):
         packet = struct.pack("B", total_length)
 
         for record in self.records:
-            packet += self._encode_record_header(record)
+            packet += record.encode_header()
             packet += record.record_data
         return packet
 
@@ -191,7 +190,7 @@ class WriteFileRecordResponse(FileRecordPDU):
         total_length = sum((record.record_length * 2) + 7 for record in self.records)
         packet = struct.pack("B", total_length)
         for record in self.records:
-            packet += self._encode_record_header(record)
+            packet += record.encode_header()
             packet += record.record_data
         return packet
 
