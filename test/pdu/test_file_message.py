@@ -94,6 +94,13 @@ class TestBitMessage:
         with pytest.raises(ModbusException):
             FileRecord(record_length=11)
 
+    def test_file_record_encode_header(self):
+        """Test file record header encoding."""
+        record = FileRecord(
+            file_number=0x01, record_number=0x02, record_data=b"\x00\x01\x02\x04"
+        )
+        assert record.encode_header() == b"\x06\x00\x01\x00\x02\x00\x02"
+
     def test_read_file_record_request_encode(self):
         """Test basic bit message encoding/decoding."""
         records = [FileRecord(file_number=0x01, record_number=0x02)]

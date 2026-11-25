@@ -30,11 +30,22 @@ class FileRecord:
             raise ModbusException("length of record_data must be a multiple of 2")
         self.record_length //= 2
 
+    def encode_header(self) -> bytes:
+        """Encode reference type, file number, record number and record length."""
+        return struct.pack(
+            ">BHHH",
+            0x06,
+            self.file_number,
+            self.record_number,
+            self.record_length,
+        )
 
-class ReadFileRecordRequest(ModbusPDU):
-    """ReadFileRecordRequest."""
 
-    function_code = 0x14
+class FileRecordPDU(ModbusPDU):  # pylint: disable=abstract-method
+    """Common base for read/write file record requests and responses.
+
+    x_encode() / x_decode() are implemented by the subclasses.
+    """
 
     @classmethod
     def x_calculateRtuFrameSize(cls, data: bytes) -> int:
@@ -51,17 +62,17 @@ class ReadFileRecordRequest(ModbusPDU):
         super().__init__(transaction_id=transaction_id, dev_id=dev_id)
         self.records: list[FileRecord] = records or []
 
+
+class ReadFileRecordRequest(FileRecordPDU):
+    """ReadFileRecordRequest."""
+
+    function_code = 0x14
+
     def x_encode(self) -> bytes:
         """Encode the request packet."""
         packet = struct.pack("B", len(self.records) * 7)
         for record in self.records:
-            packet += struct.pack(
-                ">BHHH",
-                0x06,
-                record.file_number,
-                record.record_number,
-                record.record_length,
-            )
+            packet += record.encode_header()
         return packet
 
     def x_decode(self, data: bytes) -> None:
@@ -93,25 +104,10 @@ class ReadFileRecordRequest(ModbusPDU):
         )
 
 
-class ReadFileRecordResponse(ModbusPDU):
+class ReadFileRecordResponse(FileRecordPDU):
     """ReadFileRecordResponse."""
 
     function_code = 0x14
-
-    @classmethod
-    def x_calculateRtuFrameSize(cls, data: bytes) -> int:
-        """Calculate the size of a PDU."""
-        return int(data[2]) + 2 + 3
-
-    def __init__(
-        self,
-        records: list[FileRecord] | None = None,
-        dev_id: int = 1,
-        transaction_id: int = 0,
-    ) -> None:
-        """Initialize a new instance."""
-        super().__init__(transaction_id=transaction_id, dev_id=dev_id)
-        self.records: list[FileRecord] = records or []
 
     def x_encode(self) -> bytes:
         """Encode the response."""
@@ -139,25 +135,10 @@ class ReadFileRecordResponse(ModbusPDU):
             self.records.append(record)
 
 
-class WriteFileRecordRequest(ModbusPDU):
+class WriteFileRecordRequest(FileRecordPDU):
     """WriteFileRecordRequest."""
 
     function_code = 0x15
-
-    @classmethod
-    def x_calculateRtuFrameSize(cls, data: bytes) -> int:
-        """Calculate the size of a PDU."""
-        return int(data[2]) + 2 + 3
-
-    def __init__(
-        self,
-        records: list[FileRecord] | None = None,
-        dev_id: int = 1,
-        transaction_id: int = 0,
-    ) -> None:
-        """Initialize a new instance."""
-        super().__init__(transaction_id=transaction_id, dev_id=dev_id)
-        self.records: list[FileRecord] = records or []
 
     def x_encode(self) -> bytes:
         """Encode the request packet."""
@@ -165,13 +146,7 @@ class WriteFileRecordRequest(ModbusPDU):
         packet = struct.pack("B", total_length)
 
         for record in self.records:
-            packet += struct.pack(
-                ">BHHH",
-                0x06,
-                record.file_number,
-                record.record_number,
-                record.record_length,
-            )
+            packet += record.encode_header()
             packet += record.record_data
         return packet
 
@@ -205,38 +180,17 @@ class WriteFileRecordRequest(ModbusPDU):
         )
 
 
-class WriteFileRecordResponse(ModbusPDU):
+class WriteFileRecordResponse(FileRecordPDU):
     """The normal response is an echo of the request."""
 
     function_code = 0x15
-
-    @classmethod
-    def x_calculateRtuFrameSize(cls, data: bytes) -> int:
-        """Calculate the size of a PDU."""
-        return int(data[2]) + 2 + 3
-
-    def __init__(
-        self,
-        records: list[FileRecord] | None = None,
-        dev_id: int = 1,
-        transaction_id: int = 0,
-    ) -> None:
-        """Initialize a new instance."""
-        super().__init__(transaction_id=transaction_id, dev_id=dev_id)
-        self.records: list[FileRecord] = records or []
 
     def x_encode(self) -> bytes:
         """Encode the response."""
         total_length = sum((record.record_length * 2) + 7 for record in self.records)
         packet = struct.pack("B", total_length)
         for record in self.records:
-            packet += struct.pack(
-                ">BHHH",
-                0x06,
-                record.file_number,
-                record.record_number,
-                record.record_length,
-            )
+            packet += record.encode_header()
             packet += record.record_data
         return packet
 
